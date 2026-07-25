@@ -1,0 +1,5 @@
+artifacts/
+npm/
+node_modules/
+*.tgz
+.npmrc

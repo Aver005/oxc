@@ -1,0 +1,179 @@
+name: Build and publish @artemiy/oxfmt-allman
+
+# Builds the pure-Rust oxfmt CLI for every supported target and publishes one thin root
+# package plus a per-platform binary package to the private GitLab npm registry.
+#
+# Requires one repository secret:
+#   GITLAB_NPM_TOKEN — GitLab token with the `api` scope (a deploy token with
+#                      write_package_registry also works)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g. 0.62.0)"
+        required: true
+        type: string
+      publish:
+        description: "Publish to the GitLab registry (off = build and inspect artifacts only)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  PACKAGE_DIR: packaging/oxfmt-allman
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64-gnu
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - name: linux-x64-musl
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            musl: true
+          - name: linux-arm64-gnu
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - name: linux-arm64-musl
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            musl: true
+          - name: darwin-x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - name: darwin-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: win32-x64-msvc
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: win32-arm64-msvc
+            os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # rustup picks the version pinned by rust-toolchain.toml; this only adds the target to it.
+      - name: Add Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      # Rust ships the musl libc itself but still shells out to a linker for it.
+      - name: Install musl linker
+        if: matrix.musl
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+          shared-key: allman-dist
+
+      # `--no-default-features` selects the pure-Rust CLI: no napi, no LSP, no Prettier
+      # delegation, and therefore no Node toolchain needed to build it.
+      - name: Build
+        run: cargo build -p oxfmt --release --no-default-features --target ${{ matrix.target }}
+
+      - name: Smoke test
+        # Cross-built binaries cannot run on the builder, so only check the native ones.
+        if: matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-unknown-linux-musl'
+        shell: bash
+        run: |
+          BIN="target/${{ matrix.target }}/release/oxfmt"
+          [ "${{ runner.os }}" = "Windows" ] && BIN="$BIN.exe"
+          printf 'function f(){if(1){return {a:1}}}\n' > smoke.js
+          printf '{ "braceStyle": "allman" }\n' > .oxfmtrc.json
+          "$BIN" smoke.js
+          cat smoke.js
+          grep -qx '{' smoke.js || { echo "::error::allman brace not produced"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: target/${{ matrix.target }}/release/oxfmt${{ runner.os == 'Windows' && '.exe' || '' }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Package and publish
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Each artifact lands in artifacts/<name>/oxfmt[.exe], which is the layout
+      # scripts/build-npm.mjs expects.
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ env.PACKAGE_DIR }}/artifacts
+
+      # upload-artifact does not preserve the executable bit.
+      - name: Restore executable bit
+        run: find "$PACKAGE_DIR/artifacts" -name oxfmt -type f -exec chmod +x {} +
+
+      - name: Set version
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: npm pkg set version="${{ inputs.version }}"
+
+      - name: Build platform packages
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: node scripts/build-npm.mjs
+
+      - name: Show what would be published
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: |
+          echo "root optionalDependencies:"
+          node -p "JSON.stringify(require('./package.json').optionalDependencies, null, 2)"
+          ls -la npm/
+
+      - name: Configure registry
+        if: inputs.publish
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: |
+          cat > .npmrc <<'EOF'
+          @artemiy:registry=https://gitlab.kiviuly.ru/api/v4/projects/40/packages/npm/
+          //gitlab.kiviuly.ru/api/v4/projects/40/packages/npm/:_authToken=${NPM_TOKEN}
+          EOF
+
+      # Platform packages go first: the root package's optionalDependencies point at them,
+      # so publishing the root first would leave a window where installs resolve nothing.
+      - name: Publish platform packages
+        if: inputs.publish
+        working-directory: ${{ env.PACKAGE_DIR }}
+        env:
+          NPM_TOKEN: ${{ secrets.GITLAB_NPM_TOKEN }}
+        run: |
+          for dir in npm/*/; do
+            echo "::group::publish $dir"
+            # The `./` prefix is required: npm reads a bare `npm/foo` as the GitHub
+            # shorthand for the repository `npm/foo` rather than as a local path.
+            npm publish --userconfig .npmrc "./$dir"
+            echo "::endgroup::"
+          done
+
+      - name: Publish root package
+        if: inputs.publish
+        working-directory: ${{ env.PACKAGE_DIR }}
+        env:
+          NPM_TOKEN: ${{ secrets.GITLAB_NPM_TOKEN }}
+        run: npm publish --userconfig .npmrc
+
+      - name: Upload tarballs
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-packages
+          path: ${{ env.PACKAGE_DIR }}/npm/
+          retention-days: 7
