@@ -44,6 +44,9 @@ pub struct JsFormatOptions {
     /// Whether to add non-necessary parentheses to arrow functions. Defaults to "always".
     pub arrow_parentheses: ArrowParentheses,
 
+    /// Where the opening brace of a block-like construct is placed. Defaults to "1tbs".
+    pub brace_style: BraceStyle,
+
     /// Whether to insert spaces around brackets in object literals. Defaults to true.
     pub bracket_spacing: BracketSpacing,
 
@@ -212,6 +215,7 @@ impl JsFormatOptions {
             trailing_commas: TrailingCommas::default(),
             semicolons: Semicolons::default(),
             arrow_parentheses: ArrowParentheses::default(),
+            brace_style: BraceStyle::default(),
             bracket_spacing: BracketSpacing::default(),
             bracket_same_line: BracketSameLine::default(),
             attribute_position: AttributePosition::default(),
@@ -265,6 +269,7 @@ impl fmt::Display for JsFormatOptions {
         writeln!(f, "Trailing commas: {}", self.trailing_commas)?;
         writeln!(f, "Semicolons: {}", self.semicolons)?;
         writeln!(f, "Arrow parentheses: {}", self.arrow_parentheses)?;
+        writeln!(f, "Brace style: {}", self.brace_style)?;
         writeln!(f, "Bracket spacing: {}", self.bracket_spacing.value())?;
         writeln!(f, "Bracket same line: {}", self.bracket_same_line.value())?;
         writeln!(f, "Attribute Position: {}", self.attribute_position)?;
@@ -535,6 +540,89 @@ impl fmt::Display for ArrowParentheses {
             ArrowParentheses::Always => "Always",
         };
         f.write_str(s)
+    }
+}
+
+/// Where the opening brace of a block-like construct is placed.
+///
+/// Mirrors `@stylistic/brace-style`. Only [`BraceStyle::OneTbs`] is Prettier-compatible;
+/// the other variants intentionally diverge from Prettier's output.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub enum BraceStyle {
+    /// The one true brace style, and Prettier's behavior: the opening brace stays on the line
+    /// that introduced the block, and `else` / `catch` / `finally` share a line with `}`.
+    ///
+    /// ```js
+    /// if (a) {
+    ///     b();
+    /// } else {
+    ///     c();
+    /// }
+    /// ```
+    #[default]
+    OneTbs,
+    /// Like [`BraceStyle::OneTbs`], except that `else` / `catch` / `finally` (and the `while` of a
+    /// `do...while`) start a new line.
+    ///
+    /// ```js
+    /// if (a) {
+    ///     b();
+    /// }
+    /// else {
+    ///     c();
+    /// }
+    /// ```
+    Stroustrup,
+    /// Every opening brace goes on a line of its own.
+    ///
+    /// ```js
+    /// if (a)
+    /// {
+    ///     b();
+    /// }
+    /// else
+    /// {
+    ///     c();
+    /// }
+    /// ```
+    Allman,
+}
+
+impl BraceStyle {
+    /// Whether the opening brace is preceded by a line break instead of a space.
+    pub const fn breaks_before_open_brace(self) -> bool {
+        matches!(self, Self::Allman)
+    }
+
+    /// Whether `else` / `catch` / `finally` / `while` start on their own line rather than
+    /// sharing one with the preceding `}`.
+    pub const fn breaks_before_keyword(self) -> bool {
+        matches!(self, Self::Stroustrup | Self::Allman)
+    }
+}
+
+impl FromStr for BraceStyle {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "1tbs" => Ok(Self::OneTbs),
+            "stroustrup" => Ok(Self::Stroustrup),
+            "allman" => Ok(Self::Allman),
+            _ => Err(
+                "Value not supported for BraceStyle. Supported values are '1tbs', 'stroustrup' and 'allman'.",
+            ),
+        }
+    }
+}
+
+impl fmt::Display for BraceStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            BraceStyle::OneTbs => "1tbs",
+            BraceStyle::Stroustrup => "stroustrup",
+            BraceStyle::Allman => "allman",
+        })
     }
 }
 

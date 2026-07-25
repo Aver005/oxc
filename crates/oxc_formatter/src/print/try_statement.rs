@@ -11,7 +11,7 @@ use crate::{
     write,
 };
 
-use super::FormatWrite;
+use super::{FormatWrite, write_keyword_after_brace_separator};
 
 impl<'a> FormatWrite<'a> for AstNode<'a, TryStatement<'a>> {
     fn write(&self, f: &mut JsFormatter<'_, 'a>) {
@@ -28,10 +28,12 @@ impl<'a> FormatWrite<'a> for AstNode<'a, TryStatement<'a>> {
         }
 
         if let Some(handler) = handler {
-            write!(f, [space(), handler]);
+            write_keyword_after_brace_separator(f);
+            write!(f, handler);
         }
         if let Some(finalizer) = finalizer {
-            write!(f, [space(), "finally", space()]);
+            write_keyword_after_brace_separator(f);
+            write!(f, ["finally", space()]);
             if f.comments().has_leading_own_line_comment(finalizer.span.start) {
                 // Use `write` rather than `write!` in order to avoid printing leading own line comments for `finalizer`.
                 finalizer.write(f);

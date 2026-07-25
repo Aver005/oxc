@@ -6,6 +6,7 @@ use super::{
     FormatWrite,
     arrow_function_expression::{FunctionCacheMode, GroupedCallArgumentLayout},
     block_statement::is_empty_block,
+    write_open_brace_break,
 };
 use crate::{
     ast_nodes::AstNode,
@@ -152,6 +153,7 @@ impl<'a> FormatWrite<'a> for AstNode<'a, FunctionBody<'a>> {
     fn write(&self, f: &mut JsFormatter<'_, 'a>) {
         let comments = f.context().comments().block_comments_before(self.span.start);
         write!(f, [space(), FormatLeadingComments::Comments(comments)]);
+        write_open_brace_break(f);
 
         let statements = self.statements();
         let directives = self.directives();

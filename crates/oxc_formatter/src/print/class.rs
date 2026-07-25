@@ -34,6 +34,7 @@ use crate::{
 use super::{
     FormatWrite,
     type_parameters::{FormatTSTypeParameters, FormatTSTypeParametersOptions},
+    write_open_brace_break,
 };
 
 impl<'a> FormatWrite<'a> for AstNode<'a, ClassBody<'a>> {
@@ -52,6 +53,7 @@ impl<'a> FormatWrite<'a> for AstNode<'a, ClassBody<'a>> {
             f.context_mut().push_quote_needed(quote_needed);
         }
 
+        write_open_brace_break(f);
         write!(f, ["{", block_indent(&self.body()), "}"]);
 
         if f.options().quote_properties.is_consistent() {
@@ -173,7 +175,9 @@ impl<'a> FormatWrite<'a> for AstNode<'a, PrivateIdentifier<'a>> {
 
 impl<'a> FormatWrite<'a> for AstNode<'a, StaticBlock<'a>> {
     fn write(&self, f: &mut JsFormatter<'_, 'a>) {
-        write!(f, ["static", space(), "{"]);
+        write!(f, ["static", space()]);
+        write_open_brace_break(f);
+        write!(f, "{");
 
         if self.body.is_empty() {
             write!(f, [format_dangling_comments(self.span).with_block_indent()]);

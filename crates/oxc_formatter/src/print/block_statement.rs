@@ -1,7 +1,7 @@
 use oxc_allocator::ArenaVec;
 use oxc_ast::ast::*;
 
-use super::FormatWrite;
+use super::{FormatWrite, write_open_brace_break};
 use crate::{
     ast_nodes::{AstNode, AstNodes},
     format_args,
@@ -19,6 +19,7 @@ impl<'a> Format<'a, JsFormatContext<'a>> for AstNode<'a, ArenaVec<'a, Statement<
 
 impl<'a> FormatWrite<'a> for AstNode<'a, BlockStatement<'a>> {
     fn write(&self, f: &mut JsFormatter<'_, 'a>) {
+        write_open_brace_break(f);
         write!(f, "{");
 
         let comments_before_catch_clause = if let AstNodes::CatchClause(catch) = self.parent() {

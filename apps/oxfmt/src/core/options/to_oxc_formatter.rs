@@ -1,18 +1,18 @@
 use rustc_hash::FxHashSet;
 
 use oxc_formatter::{
-    ArrowParentheses, AttributePosition, BracketSameLine, BracketSpacing, CustomGroupDefinition,
-    EmbeddedLanguageFormatting, Expand, GroupEntry, ImportModifier, ImportSelector,
-    JsFormatOptions, QuoteProperties, QuoteStyle, Semicolons, SortImportsOptions, SortOrder,
-    SortTailwindcssOptions, TrailingCommas,
+    ArrowParentheses, AttributePosition, BraceStyle, BracketSameLine, BracketSpacing,
+    CustomGroupDefinition, EmbeddedLanguageFormatting, Expand, GroupEntry, ImportModifier,
+    ImportSelector, JsFormatOptions, QuoteProperties, QuoteStyle, Semicolons, SortImportsOptions,
+    SortOrder, SortTailwindcssOptions, TrailingCommas,
 };
 
 use super::{
     super::oxfmtrc::{
-        ArrowParensConfig, CustomGroupItemConfig, EmbeddedLanguageFormattingConfig, FormatConfig,
-        HtmlWhitespaceSensitivityConfig, JsdocUserConfig, ObjectWrapConfig, QuotePropsConfig,
-        SortGroupItemConfig, SortImportsUserConfig, SortOrderConfig, SortTailwindcssUserConfig,
-        TrailingCommaConfig,
+        ArrowParensConfig, BraceStyleConfig, CustomGroupItemConfig,
+        EmbeddedLanguageFormattingConfig, FormatConfig, HtmlWhitespaceSensitivityConfig,
+        JsdocUserConfig, ObjectWrapConfig, QuotePropsConfig, SortGroupItemConfig,
+        SortImportsUserConfig, SortOrderConfig, SortTailwindcssUserConfig, TrailingCommaConfig,
     },
     to_core_options::to_core_options,
 };
@@ -77,6 +77,15 @@ pub fn to_oxc_formatter(config: &FormatConfig) -> Result<JsFormatOptions, String
         format_options.arrow_parentheses = match parens {
             ArrowParensConfig::Avoid => ArrowParentheses::AsNeeded,
             ArrowParensConfig::Always => ArrowParentheses::Always,
+        };
+    }
+
+    // [Oxfmt] braceStyle: "1tbs" | "stroustrup" | "allman"
+    if let Some(style) = config.brace_style {
+        format_options.brace_style = match style {
+            BraceStyleConfig::OneTbs => BraceStyle::OneTbs,
+            BraceStyleConfig::Stroustrup => BraceStyle::Stroustrup,
+            BraceStyleConfig::Allman => BraceStyle::Allman,
         };
     }
 

@@ -99,6 +99,30 @@ use self::{
     type_parameters::{FormatTSTypeParameters, FormatTSTypeParametersOptions},
 };
 
+/// Writes the line break that precedes the opening `{` of a block-like construct under
+/// [`BraceStyle::Allman`], and nothing under the other styles.
+///
+/// Call this immediately before emitting the `{`. It does not need the caller to drop the
+/// `space()` that the enclosing node already wrote: the printer discards a pending space when a
+/// line break is printed, and skips a break entirely when the line is still empty
+/// (see `pending_space` handling in `oxc_formatter_core::printer`). That keeps the change local to
+/// the nodes that own the brace instead of spreading it across every parent that introduces one.
+pub fn write_open_brace_break(f: &mut JsFormatter<'_, '_>) {
+    if f.options().brace_style.breaks_before_open_brace() {
+        write!(f, hard_line_break());
+    }
+}
+
+/// Writes the separator between a closing `}` and a following `else` / `catch` / `finally` /
+/// `while` keyword: a space under `1tbs`, a line break under `stroustrup` and `allman`.
+pub fn write_keyword_after_brace_separator(f: &mut JsFormatter<'_, '_>) {
+    if f.options().brace_style.breaks_before_keyword() {
+        write!(f, hard_line_break());
+    } else {
+        write!(f, space());
+    }
+}
+
 pub trait FormatWrite<'ast, T = ()> {
     fn write(&self, f: &mut JsFormatter<'_, 'ast>);
     fn write_with_options(&self, _options: T, _f: &mut JsFormatter<'_, 'ast>) {
@@ -758,7 +782,7 @@ impl<'a> FormatWrite<'a> for AstNode<'a, DoWhileStatement<'a>> {
         let body = self.body();
         write!(f, group(&format_args!("do", FormatStatementBody::new(body))));
         if matches!(body.as_ref(), Statement::BlockStatement(_)) {
-            write!(f, space());
+            write_keyword_after_brace_separator(f);
         } else {
             write!(f, hard_line_break());
         }
@@ -1016,7 +1040,8 @@ impl<'a> FormatWrite<'a> for AstNode<'a, IfStatement<'a>> {
                 });
 
             let else_on_same_line = matches!(consequent.as_ref(), Statement::BlockStatement(_))
-                && (!has_line_comment || !has_dangling_comments);
+                && (!has_line_comment || !has_dangling_comments)
+                && !f.options().brace_style.breaks_before_keyword();
 
             if else_on_same_line {
                 write!(f, [space(), has_dangling_comments.then(line_suffix_boundary)]);
@@ -1350,7 +1375,9 @@ impl<'a> FormatWrite<'a> for AstNode<'a, TSEnumDeclaration<'a>> {
         if self.r#const() {
             write!(f, ["const", space()]);
         }
-        write!(f, ["enum", space(), self.id(), space(), "{", self.body(), "}"]);
+        write!(f, ["enum", space(), self.id(), space()]);
+        write_open_brace_break(f);
+        write!(f, ["{", self.body(), "}"]);
     }
 }
 
@@ -1780,7 +1807,9 @@ impl<'a> FormatWrite<'a> for AstNode<'a, TSInterfaceDeclaration<'a>> {
 
 impl<'a> FormatWrite<'a> for AstNode<'a, TSInterfaceBody<'a>> {
     fn write(&self, f: &mut JsFormatter<'_, 'a>) {
-        write!(f, [space(), "{"]);
+        write!(f, space());
+        write_open_brace_break(f);
+        write!(f, "{");
 
         if self.body.is_empty() {
             write!(f, format_dangling_comments(self.span).with_block_indent());
@@ -1994,6 +2023,7 @@ impl<'a> FormatWrite<'a> for AstNode<'a, TSModuleBlock<'a>> {
         let body = self.body();
         let span = self.span();
 
+        write_open_brace_break(f);
         write!(f, "{");
         if is_empty_block(&self.body) && directives.is_empty() {
             write!(f, [format_dangling_comments(span).with_block_indent()]);

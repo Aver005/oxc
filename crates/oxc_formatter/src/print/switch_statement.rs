@@ -15,7 +15,7 @@ use crate::{
     write,
 };
 
-use super::FormatWrite;
+use super::{FormatWrite, write_open_brace_break};
 
 impl<'a> FormatWrite<'a> for AstNode<'a, SwitchStatement<'a>> {
     fn write(&self, f: &mut JsFormatter<'_, 'a>) {
@@ -34,20 +34,9 @@ impl<'a> FormatWrite<'a> for AstNode<'a, SwitchStatement<'a>> {
                 cases.fmt(f);
             }
         });
-        write!(
-            f,
-            [
-                "switch",
-                space(),
-                "(",
-                group(&soft_block_indent(&discriminant)),
-                ")",
-                space(),
-                "{",
-                block_indent(&format_cases),
-                "}"
-            ]
-        );
+        write!(f, ["switch", space(), "(", group(&soft_block_indent(&discriminant)), ")", space()]);
+        write_open_brace_break(f);
+        write!(f, ["{", block_indent(&format_cases), "}"]);
     }
 }
 
