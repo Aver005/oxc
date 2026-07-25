@@ -67,16 +67,25 @@ This also covers the cases where the literal merely *starts* the expression, suc
 This packages the **pure-Rust CLI** (`cargo build -p oxfmt --no-default-features`), not the
 Node/NAPI hybrid that upstream ships on npm. Compared to upstream `oxfmt`:
 
-- Formats JS, TS, JSX, TSX, JSON, GraphQL and TOML
+- Formats `.js` `.jsx` `.ts` `.tsx` `.json` `.jsonc` `.css` `.scss` `.less` `.graphql` `.toml`
+- Silently skips `.vue`, `.svelte`, `.md`, `.html`, `.yaml` — those need Prettier delegation
 - No stdin support, no LSP, no Node API
 - No embedded-language formatting (css-in-js, gql-in-js, html-in-js)
-- No delegation to Prettier, so Vue / Svelte / Markdown are not handled
 
-Only a `win32-x64` binary is bundled. For another platform, build from the fork:
+`braceStyle` only affects JS/TS/JSX/TSX.
 
-```sh
-cargo build -p oxfmt --release --no-default-features
-```
+## Platforms
+
+Binaries ship as optional per-platform packages, so npm downloads only the matching one:
+
+| OS | x64 | arm64 |
+| --- | --- | --- |
+| Linux (glibc) | yes | yes |
+| Linux (musl / Alpine) | yes | yes |
+| macOS | yes | yes |
+| Windows | yes | yes |
+
+Works in Docker on Ubuntu, Debian and Alpine with no extra setup.
 
 ## Upstream
 

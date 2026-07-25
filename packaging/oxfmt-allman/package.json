@@ -1,6 +1,6 @@
 {
   "name": "@artemiy/oxfmt-allman",
-  "version": "0.61.0",
+  "version": "0.62.0",
   "description": "oxfmt fork with a braceStyle option (1tbs / stroustrup / allman)",
   "keywords": [
     "formatter",
