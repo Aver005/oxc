@@ -137,16 +137,15 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: npm pkg set version="$VERSION"
 
-      - name: Build platform packages
+      - name: Bundle binaries
         working-directory: ${{ env.PACKAGE_DIR }}
         run: node scripts/build-npm.mjs
 
       - name: Show what would be published
         working-directory: ${{ env.PACKAGE_DIR }}
         run: |
-          echo "root optionalDependencies:"
-          node -p "JSON.stringify(require('./package.json').optionalDependencies, null, 2)"
-          ls -la npm/
+          ls -la binaries/
+          npm pack --dry-run
 
       - name: Configure registry
         if: inputs.publish
@@ -157,36 +156,22 @@ jobs:
           //gitlab.kiviuly.ru/api/v4/projects/40/packages/npm/:_authToken=${NPM_TOKEN}
           EOF
 
-      # Platform packages go first: the root package's optionalDependencies point at them,
-      # so publishing the root first would leave a window where installs resolve nothing.
-      #
-      # The `use-trusted-publishing` audit is suppressed on both publish commands below:
-      # trusted publishing is npmjs.com's OIDC flow, and this registry is a self-hosted
-      # GitLab instance that only accepts token auth.
-      - name: Publish platform packages
-        if: inputs.publish
-        working-directory: ${{ env.PACKAGE_DIR }}
-        env:
-          NPM_TOKEN: ${{ secrets.GITLAB_NPM_TOKEN }}
-        run: | # zizmor: ignore[use-trusted-publishing]
-          for dir in npm/*/; do
-            echo "::group::publish $dir"
-            # The `./` prefix is required: npm reads a bare `npm/foo` as the GitHub
-            # shorthand for the repository `npm/foo` rather than as a local path.
-            npm publish --userconfig .npmrc "./$dir"
-            echo "::endgroup::"
-          done
-
-      - name: Publish root package
+      # Trusted publishing is npmjs.com's OIDC flow, and this registry is a self-hosted
+      # GitLab instance that only accepts token auth, so that audit is suppressed below.
+      - name: Publish
         if: inputs.publish
         working-directory: ${{ env.PACKAGE_DIR }}
         env:
           NPM_TOKEN: ${{ secrets.GITLAB_NPM_TOKEN }}
         run: npm publish --userconfig .npmrc # zizmor: ignore[use-trusted-publishing]
 
-      - name: Upload tarballs
+      - name: Pack tarball
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: npm pack
+
+      - name: Upload tarball
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: npm-packages
-          path: ${{ env.PACKAGE_DIR }}/npm/
+          name: npm-tarball
+          path: ${{ env.PACKAGE_DIR }}/*.tgz
           retention-days: 7

@@ -1,4 +1,5 @@
 artifacts/
+binaries/
 npm/
 node_modules/
 *.tgz

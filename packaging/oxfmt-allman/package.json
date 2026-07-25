@@ -1,6 +1,6 @@
 {
   "name": "@artemiy/oxfmt-allman",
-  "version": "0.62.0",
+  "version": "0.63.0",
   "description": "oxfmt fork with a braceStyle option (1tbs / stroustrup / allman)",
   "keywords": [
     "formatter",
@@ -19,6 +19,7 @@
     "oxfmt": "bin/oxfmt.js"
   },
   "files": [
+    "binaries",
     "bin",
     "configuration_schema.json",
     "AGENTS.md",
@@ -30,8 +31,5 @@
   },
   "publishConfig": {
     "@artemiy:registry": "https://gitlab.kiviuly.ru/api/v4/projects/40/packages/npm/"
-  },
-  "optionalDependencies": {
-    "@artemiy/oxfmt-allman-win32-x64-msvc": "0.61.0"
   }
 }

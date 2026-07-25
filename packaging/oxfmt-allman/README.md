@@ -76,7 +76,7 @@ Node/NAPI hybrid that upstream ships on npm. Compared to upstream `oxfmt`:
 
 ## Platforms
 
-Binaries ship as optional per-platform packages, so npm downloads only the matching one:
+One package ships every binary and picks the right one at runtime:
 
 | OS | x64 | arm64 |
 | --- | --- | --- |
@@ -86,6 +86,18 @@ Binaries ship as optional per-platform packages, so npm downloads only the match
 | Windows | yes | yes |
 
 Works in Docker on Ubuntu, Debian and Alpine with no extra setup.
+
+### Why a single package
+
+esbuild, swc and upstream oxfmt split binaries into per-platform packages behind
+`optionalDependencies`, so npm downloads only the one it needs. That does not work on a GitLab
+npm registry: GitLab serves a minimal packument containing only `bin`, `dist`, `engines`, `name`
+and `version`. `optionalDependencies`, `os` and `cpu` are dropped, and since npm resolves
+dependencies from the packument rather than from the tarball, it never learns the platform
+packages exist — you end up with a shim and no binary. Verified against GitLab 17.9.
+
+The cost is download size: roughly 20 MB compressed, 44 MB on disk. To trim it, delete the
+targets you do not need from `binaries/` before publishing.
 
 ## Upstream
 

@@ -46,7 +46,7 @@ Create `.npmrc` in the project root — **with the `${NPM_TOKEN}` placeholder, n
 Then install, with the token supplied from the environment:
 
 ```sh
-NPM_TOKEN=<token> npm i -D @artemiy/oxfmt-allman@0.62.0
+NPM_TOKEN=<token> npm i -D @artemiy/oxfmt-allman@0.63.0
 ```
 
 The token needs the `api` scope (a GitLab deploy token with `read_package_registry` also works for
@@ -119,12 +119,12 @@ This build is the pure-Rust CLI, not the Node/NAPI hybrid upstream ships.
 
 ## Platforms
 
-The binary ships as an optional per-platform dependency, so npm downloads only the one it needs.
-Supported: Linux x64 and arm64 (both glibc and musl), macOS x64 and arm64, Windows x64 and arm64.
+One package bundles every binary and selects the right one at runtime. Supported: Linux x64 and
+arm64 (both glibc and musl), macOS x64 and arm64, Windows x64 and arm64.
 
-This works in Docker on both Ubuntu/Debian (glibc) and Alpine (musl) — no extra setup, just install
-the package. If you are writing a Dockerfile, install it like any other dev dependency; do **not**
-try to download a binary manually.
+This works in Docker on Ubuntu/Debian (glibc) and Alpine (musl) with no extra setup — install it
+like any other dev dependency; do **not** download a binary manually. The package is around 20 MB
+compressed because it carries all eight binaries.
 
 ## Troubleshooting
 
@@ -132,8 +132,7 @@ try to download a binary manually.
 | --- | --- | --- |
 | `404 Not Found - @artemiy/oxfmt-allman` | Scope not mapped to the GitLab registry | Add the `.npmrc` above |
 | `401 Unauthorized` | `NPM_TOKEN` unset, expired, or lacks `api` scope | Export a valid token |
-| `the binary package @artemiy/oxfmt-allman-… is not installed` | The optional platform dependency was skipped — usually an unauthenticated or offline install | Fix the registry auth, then `npm i` again |
-| `unsupported platform` | Neither Linux/macOS/Windows on x64/arm64 | Build from source: `cargo build -p oxfmt --release --no-default-features` |
+| `no bundled binary for <platform>` | Not Linux/macOS/Windows on x64/arm64 | Build from source: `cargo build -p oxfmt --release --no-default-features` |
 | `JS/TS config file … is not supported` | An `oxfmt.config.ts` exists | Convert it to `.oxfmtrc.json` |
 | Braces reverted across many files | Prettier/Biome ran | Revert, remove that formatter from scripts and hooks, re-run `npx oxfmt` |
 | `oxfmt: command not found` | Looked for `oxfmt-allman` | The binary is `oxfmt` |
