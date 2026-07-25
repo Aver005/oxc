@@ -62,7 +62,9 @@ jobs:
             target: aarch64-pc-windows-msvc
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       # rustup picks the version pinned by rust-toolchain.toml; this only adds the target to it.
       - name: Add Rust target
@@ -73,7 +75,7 @@ jobs:
         if: matrix.musl
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           key: ${{ matrix.target }}
           shared-key: allman-dist
@@ -96,7 +98,7 @@ jobs:
           cat smoke.js
           grep -qx '{' smoke.js || { echo "::error::allman brace not produced"; exit 1; }
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.name }}
           path: target/${{ matrix.target }}/release/oxfmt${{ runner.os == 'Windows' && '.exe' || '' }}
@@ -108,15 +110,17 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
 
-      # Each artifact lands in artifacts/<name>/oxfmt[.exe], which is the layout
-      # scripts/build-npm.mjs expects.
-      - uses: actions/download-artifact@v4
+      # merge-multiple stays at its default of false, so each artifact lands in
+      # artifacts/<name>/oxfmt[.exe] — the layout scripts/build-npm.mjs expects.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: ${{ env.PACKAGE_DIR }}/artifacts
 
@@ -124,9 +128,14 @@ jobs:
       - name: Restore executable bit
         run: find "$PACKAGE_DIR/artifacts" -name oxfmt -type f -exec chmod +x {} +
 
+      # The input goes through the environment rather than being expanded straight into the
+      # shell: `${{ }}` interpolation happens before the script runs, so a crafted version
+      # string would otherwise execute as code.
       - name: Set version
         working-directory: ${{ env.PACKAGE_DIR }}
-        run: npm pkg set version="${{ inputs.version }}"
+        env:
+          VERSION: ${{ inputs.version }}
+        run: npm pkg set version="$VERSION"
 
       - name: Build platform packages
         working-directory: ${{ env.PACKAGE_DIR }}
@@ -150,12 +159,16 @@ jobs:
 
       # Platform packages go first: the root package's optionalDependencies point at them,
       # so publishing the root first would leave a window where installs resolve nothing.
+      #
+      # The `use-trusted-publishing` audit is suppressed on both publish commands below:
+      # trusted publishing is npmjs.com's OIDC flow, and this registry is a self-hosted
+      # GitLab instance that only accepts token auth.
       - name: Publish platform packages
         if: inputs.publish
         working-directory: ${{ env.PACKAGE_DIR }}
         env:
           NPM_TOKEN: ${{ secrets.GITLAB_NPM_TOKEN }}
-        run: |
+        run: | # zizmor: ignore[use-trusted-publishing]
           for dir in npm/*/; do
             echo "::group::publish $dir"
             # The `./` prefix is required: npm reads a bare `npm/foo` as the GitHub
@@ -169,10 +182,10 @@ jobs:
         working-directory: ${{ env.PACKAGE_DIR }}
         env:
           NPM_TOKEN: ${{ secrets.GITLAB_NPM_TOKEN }}
-        run: npm publish --userconfig .npmrc
+        run: npm publish --userconfig .npmrc # zizmor: ignore[use-trusted-publishing]
 
       - name: Upload tarballs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: npm-packages
           path: ${{ env.PACKAGE_DIR }}/npm/
